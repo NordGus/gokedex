@@ -2,11 +2,8 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"net/http"
-	"net/url"
-	"strconv"
-	"strings"
-	"sync"
 	"time"
 
 	"github.com/NordGus/gokedex/pokeapi"
@@ -17,71 +14,22 @@ func main() {
 		Timeout: time.Millisecond * 3000,
 	}
 
-	apiClient := pokeapi.NewClient(&client)
-	limit := 20
-	output := make(chan pokeapi.DetailPokemonResponse)
-	resultCount := 0
+	service := pokeapi.NewService(&client)
+	start := time.Now()
+	pokemon := service.ExtractPokemon()
 
-	go func(client pokeapi.Client, output chan pokeapi.DetailPokemonResponse, limit int) {
-		var wg sync.WaitGroup
+	fmt.Println("Duration:", time.Since(start))
 
-		for offset := 0; ; offset += limit {
-			data, err := client.ListPokemon(uint(offset), uint(limit))
-			if err != nil {
-				panic(err.Error())
-			}
+	different := make(map[int64][]pokeapi.Pokemon)
 
-			resultCount = int(data.Count)
-
-			for _, result := range data.Results {
-				wg.Add(1)
-				go getPokemon(&wg, client, result, output)
-			}
-
-			if data.Next == "" {
-				wg.Wait()
-				close(output)
-				break
-			}
-		}
-	}(apiClient, output, limit)
-
-	count := 0
-
-	for range output {
-		count++
+	for _, pk := range pokemon {
+		different[pk.Number] = append(different[pk.Number], pk)
 	}
 
-	fmt.Println(count)
-	fmt.Println(resultCount)
-	fmt.Println(count == resultCount)
-}
+	random := rand.New(rand.NewSource(time.Now().Unix()))
 
-func getPokemon(wg *sync.WaitGroup, client pokeapi.Client, data pokeapi.ListPokemonResponseResult, out chan<- pokeapi.DetailPokemonResponse) {
-	defer wg.Done()
-
-	u, err := url.Parse(data.Url)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	path := []string{}
-
-	for _, s := range strings.Split(u.Path, "/") {
-		if s != "" {
-			path = append(path, s)
-		}
-	}
-
-	id, err := strconv.Atoi(path[len(path)-1])
-	if err != nil {
-		panic(err.Error())
-	}
-
-	result, err := client.GetPokemon(uint(id))
-	if err != nil {
-		panic(err.Error())
-	}
-
-	out <- result
+	fmt.Println("Different Pokémon:", len(different))
+	fmt.Println("Repited Pokémon:", (len(pokemon) - len(different)))
+	fmt.Println("Processed Pokémon:", len(pokemon))
+	fmt.Printf("Processed Pokémon Example:\n%+v\n", pokemon[random.Intn(len(pokemon))])
 }

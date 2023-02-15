@@ -1,4 +1,4 @@
-package pokeapi
+package client
 
 import (
 	"encoding/json"
@@ -21,7 +21,6 @@ type Client struct {
 type ListPokemonResponse struct {
 	Count   uint64                      `json:"count"`
 	Next    string                      `json:"next"`
-	Prev    string                      `json:"prev"`
 	Results []ListPokemonResponseResult `json:"results"`
 }
 
@@ -31,11 +30,46 @@ type ListPokemonResponseResult struct {
 }
 
 type DetailPokemonResponse struct {
-	ID     uint64 `json:"id"`
-	Name   string `json:"name"`
-	Order  int64  `json:"order"`
-	Height uint64 `json:"height"`
-	Weight uint64 `json:"weight"`
+	ID       uint64                       `json:"id"`
+	Name     string                       `json:"name"`
+	Order    int64                        `json:"order"`
+	Height   uint64                       `json:"height"`
+	Weight   uint64                       `json:"weight"`
+	Stats    []DetailPokemonResponseStats `json:"stats"`
+	Types    []DetailPokemonResponseTypes `json:"types"`
+	Sprites  DetailPokemonResponseSprites `json:"sprites"`
+	Versions map[string]interface{}       `json:"versions"`
+}
+
+type DetailPokemonResponseStats struct {
+	BaseStat uint64                    `json:"base_stat"`
+	Stat     DetailPokemonResponseStat `json:"stat"`
+}
+
+type DetailPokemonResponseStat struct {
+	Name string `json:"name"`
+}
+
+type DetailPokemonResponseTypes struct {
+	Slot uint64                    `json:"slot"`
+	Type DetailPokemonResponseType `json:"type"`
+}
+
+type DetailPokemonResponseType struct {
+	Name string `json:"name"`
+}
+
+type DetailPokemonResponseSprites struct {
+	FrontDefault string                            `json:"front_default"`
+	Other        DetailPokemonResponseSpritesOther `json:"other"`
+}
+
+type DetailPokemonResponseSpritesOther struct {
+	OfficialArtwork DetailPokemonResponseSpritesOtherOfficialArtwork `json:"official-artwork"`
+}
+
+type DetailPokemonResponseSpritesOtherOfficialArtwork struct {
+	FrontDefault string `json:"front_default"`
 }
 
 func NewClient(conn Connection) Client {
