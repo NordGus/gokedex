@@ -1,5 +1,5 @@
 {
-    "name": "Your project Dev",
+    "name": "Gokédex, a Notion Intgration with PokéAPI writen in Go",
     "dockerFile": "Dockerfile",
     // "appPort": 8000,
     "customizations": {
@@ -8,7 +8,8 @@
                 "golang.Go",
                 "davidanson.vscode-markdownlint",
                 "shardulm94.trailing-spaces",
-                "IBM.output-colorizer"
+                "IBM.output-colorizer",
+                "rangav.vscode-thunder-client"
             ],
             "settings": {
                 "go.useLanguageServer": true
