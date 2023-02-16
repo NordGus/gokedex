@@ -3,6 +3,6 @@ package integrate
 import "net/http"
 
 type Connection interface {
-	Get(string) (*http.Response, error)
+	Do(*http.Request) (*http.Response, error)
 	CloseIdleConnections()
 }

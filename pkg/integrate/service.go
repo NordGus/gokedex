@@ -2,61 +2,62 @@ package integrate
 
 import (
 	"fmt"
-	"math/rand"
-	"time"
+	"sync"
 
 	"github.com/NordGus/gokedex/pkg/extract"
 )
 
 type Service struct {
-	client client
+	client     client
+	databaseID DatabaseID
 }
 
 func NewService(conn Connection, secret IntegrationSecret, databaseId DatabaseID) Service {
 	return Service{
-		client: newClient(conn, secret, databaseId),
+		client:     newClient(conn, secret),
+		databaseID: databaseId,
 	}
 }
 
 func (s *Service) IntegrateToNotion(in <-chan extract.Pokemon) <-chan struct{} {
 	out := make(chan struct{})
+	pokemon := s.preparePokemonPages(in)
 
-	go func(in <-chan extract.Pokemon, out chan<- struct{}) {
+	go func(in <-chan PokemonPage, out chan<- struct{}) {
 		defer close(out)
-		pokemon := []extract.Pokemon{}
+		pokemon := []PokemonPage{}
 
 		for poke := range in {
 			pokemon = append(pokemon, poke)
+			fmt.Printf("Pokemon Page:\n%+v\n", poke)
 		}
-
-		random := rand.New(rand.NewSource(time.Now().Unix()))
-		sample := pokemon[random.Intn(len(pokemon))]
 
 		fmt.Println("Processed Pokémon:", len(pokemon))
-		fmt.Println("Sample Pokémon:")
-		fmt.Println("\tID:", sample.ID)
-		fmt.Println("\tName:", sample.Name)
-		fmt.Println("\tNumber:", sample.Number)
-		fmt.Printf("\tType: %+v\n", sample.Type)
-		fmt.Println("\tHeight:", sample.Height)
-		fmt.Println("\tWeight:", sample.Weight)
-		fmt.Println("\tHP:", sample.HP)
-		fmt.Println("\tAttack:", sample.Attack)
-		fmt.Println("\tDefense:", sample.Defense)
-		fmt.Println("\tSpAttack:", sample.SpAttack)
-		fmt.Println("\tSpDefense:", sample.SpDefense)
-		fmt.Println("\tSpeed:", sample.Speed)
-		fmt.Printf("\tCategory: %+v\n", sample.Category)
-		fmt.Println("\tGeneration:", sample.Generation)
-		fmt.Println("\tSprite:", sample.Sprite)
-		fmt.Println("\tArtwork:", sample.Artwork)
-		fmt.Println("\tBulbapediaURL:", sample.BulbapediaURL)
-		fmt.Println("\tFlavorText:")
-		for _, text := range sample.FlavorText {
-			fmt.Println("\t\tVersion:", text.Version)
-			fmt.Println("\t\tText:", text.Text)
-		}
-	}(in, out)
+	}(pokemon, out)
 
 	return out
+}
+
+func (s *Service) preparePokemonPages(in <-chan extract.Pokemon) <-chan PokemonPage {
+	var wg sync.WaitGroup
+	out := make(chan PokemonPage)
+
+	go func(wg *sync.WaitGroup, in <-chan extract.Pokemon, out chan<- PokemonPage) {
+		defer close(out)
+
+		for pokemon := range in {
+			wg.Add(1)
+			go s.mapPokemonPage(wg, pokemon, out)
+		}
+
+		wg.Wait()
+	}(&wg, in, out)
+
+	return out
+}
+
+func (s *Service) mapPokemonPage(wg *sync.WaitGroup, pokemon extract.Pokemon, out chan<- PokemonPage) {
+	defer wg.Done()
+
+	out <- externalPokemonToInternalPokemon(pokemon, s.databaseID)
 }
