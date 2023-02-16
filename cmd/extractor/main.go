@@ -19,7 +19,7 @@ func main() {
 	}
 
 	notion := http.Client{
-		Timeout: time.Millisecond * 3000,
+		Timeout: time.Second * 60,
 	}
 
 	extractor := extract.NewService(&pokeapi)
