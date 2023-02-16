@@ -7,17 +7,26 @@ import (
 )
 
 type PokemonPage struct {
-	PageID     string
-	Parent     NotionPageParent             `json:"parent"`
-	Icon       NotionPageExternalFileObject `json:"icon"`
-	Cover      NotionPageExternalFileObject `json:"cover"`
-	Properties PokemonPageProperties        `json:"properties"`
-	Children   []NotionPageBlockObject      `json:"children"`
+	Parent     NotionPageParent            `json:"parent"`
+	Icon       NotionPageExternalFileIcon  `json:"icon"`
+	Cover      NotionPageExternalFileCover `json:"cover"`
+	Properties PokemonPageProperties       `json:"properties"`
+	Children   []NotionPageBlockObject     `json:"children"`
 }
 
 type NotionPageParent struct {
 	Type       string `json:"type"`
 	DatabaseID string `json:"database_id"`
+}
+
+type NotionPageExternalFileIcon struct {
+	Type     string                                     `json:"type"`
+	External NotionPageExternalFileObjectExternalObject `json:"external"`
+}
+
+type NotionPageExternalFileCover struct {
+	Type     string                                     `json:"type"`
+	External NotionPageExternalFileObjectExternalObject `json:"external"`
 }
 
 type PokemonPageProperties struct {
@@ -37,16 +46,9 @@ type PokemonPageProperties struct {
 }
 
 type NotionPageTitleProperty struct {
-	Title []NotionPageTitleObject `json:"title"`
-}
-
-type NotionPageTitleObject struct {
-	Type string                          `json:"type"`
-	Text NotionPageTitleObjectTextObject `json:"text"`
-}
-
-type NotionPageTitleObjectTextObject struct {
-	Content string `json:"content"`
+	ID    string                 `json:"id"`
+	Type  string                 `json:"type"`
+	Title []NotionRichTextObject `json:"title"`
 }
 
 type NotionPageNumberObject struct {
@@ -68,6 +70,12 @@ type NotionPageSelectOptionObject struct {
 }
 
 type NotionPageExternalFileObject struct {
+	Type  string                                 `json:"type"`
+	Files []NotionPageExternalFilePropertyObject `json:"files"`
+}
+
+type NotionPageExternalFilePropertyObject struct {
+	Name     string                                     `json:"name"`
 	Type     string                                     `json:"type"`
 	External NotionPageExternalFileObjectExternalObject `json:"external"`
 }
@@ -99,12 +107,12 @@ type NotionCalloutBlock struct {
 
 type NotionCalloutBlockType struct {
 	RichText []NotionRichTextObject `json:"rich_text"`
-	Icon     NotionEmojiObject      `json:"emoji"`
+	Icon     NotionEmojiObject      `json:"icon"`
 	Color    string                 `json:"color"`
 }
 
 type NotionRichTextObject struct {
-	Type        string                  `json:"string"`
+	Type        string                  `json:"type"`
 	Text        NotionTextObject        `json:"text"`
 	Annotations NotionAnnotationsObject `json:"annotations"`
 	PlainText   string                  `json:"plain_text"`
@@ -134,13 +142,13 @@ func externalPokemonToInternalPokemon(external extract.Pokemon, databaseID Datab
 			Type:       "database_id",
 			DatabaseID: string(databaseID),
 		},
-		Icon: NotionPageExternalFileObject{
+		Icon: NotionPageExternalFileIcon{
 			Type: "external",
 			External: NotionPageExternalFileObjectExternalObject{
 				Url: external.Sprite,
 			},
 		},
-		Cover: NotionPageExternalFileObject{
+		Cover: NotionPageExternalFileCover{
 			Type: "external",
 			External: NotionPageExternalFileObjectExternalObject{
 				Url: external.Artwork,
@@ -148,12 +156,18 @@ func externalPokemonToInternalPokemon(external extract.Pokemon, databaseID Datab
 		},
 		Properties: PokemonPageProperties{
 			Name: NotionPageTitleProperty{
-				Title: []NotionPageTitleObject{
+				ID:   "title",
+				Type: "title",
+				Title: []NotionRichTextObject{
 					{
-						Type: "title",
-						Text: NotionPageTitleObjectTextObject{
+						Type: "text",
+						Text: NotionTextObject{
 							Content: external.Name,
 						},
+						Annotations: NotionAnnotationsObject{
+							Color: "default",
+						},
+						PlainText: external.Name,
 					},
 				},
 			},
@@ -189,9 +203,15 @@ func externalPokemonToInternalPokemon(external extract.Pokemon, databaseID Datab
 				MultiSelect: []NotionPageSelectOptionObject{},
 			},
 			Sprite: NotionPageExternalFileObject{
-				Type: "external",
-				External: NotionPageExternalFileObjectExternalObject{
-					Url: external.Sprite,
+				Type: "files",
+				Files: []NotionPageExternalFilePropertyObject{
+					{
+						Name: external.Sprite,
+						Type: "external",
+						External: NotionPageExternalFileObjectExternalObject{
+							Url: external.Sprite,
+						},
+					},
 				},
 			},
 			Generation: NotionPageSelectObject{
@@ -221,9 +241,8 @@ func externalPokemonToInternalPokemon(external extract.Pokemon, databaseID Datab
 						},
 						Annotations: NotionAnnotationsObject{
 							Bold:  true,
-							Color: "defualt",
+							Color: "default",
 						},
-						PlainText: flavorText.Version,
 					},
 					{
 						Type: "text",
@@ -231,9 +250,8 @@ func externalPokemonToInternalPokemon(external extract.Pokemon, databaseID Datab
 							Content: flavorText.Text,
 						},
 						Annotations: NotionAnnotationsObject{
-							Color: "defualt",
+							Color: "default",
 						},
-						PlainText: flavorText.Text,
 					},
 				},
 				Icon: NotionEmojiObject{

@@ -1,7 +1,11 @@
 package integrate
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"net/url"
 )
 
@@ -23,9 +27,46 @@ func newClient(conn Connection, secret IntegrationSecret) client {
 	}
 }
 
-// func (c *client) createPokemonPage(pokemon Pokemon) (PokemonResponse, error) {
-// 	req := http.NewRequest("GET", c.parseUrl())
-// }
+func (c *client) createPokemonPage(pokemon PokemonPage) (map[string]interface{}, error) {
+	var data map[string]interface{}
+
+	reqUrl, err := c.parseUrl("/pages", map[string]string{})
+	if err != nil {
+		return data, err
+	}
+
+	postBody, err := json.Marshal(pokemon)
+	if err != nil {
+		return data, err
+	}
+
+	req, err := http.NewRequest("POST", reqUrl, bytes.NewBuffer(postBody))
+	if err != nil {
+		return data, err
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %v", c.secret))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Notion-Version", "2022-06-28")
+
+	resp, err := c.conn.Do(req)
+	if err != nil {
+		return data, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return data, err
+	}
+
+	err = json.Unmarshal(body, &data)
+	if err != nil {
+		return data, err
+	}
+
+	return data, nil
+}
 
 func (c *client) parseUrl(path string, query map[string]string) (string, error) {
 	u, err := url.Parse(fmt.Sprintf("%v%v", c.baseUrl, path))

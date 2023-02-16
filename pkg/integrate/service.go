@@ -22,10 +22,11 @@ func NewService(conn Connection, secret IntegrationSecret, databaseId DatabaseID
 func (s *Service) IntegrateToNotion(in <-chan extract.Pokemon) <-chan struct{} {
 	out := make(chan struct{})
 	pokemon := s.preparePokemonPages(in)
+	pages := s.createPokedexPages(pokemon)
 
-	go func(in <-chan PokemonPage, out chan<- struct{}) {
+	go func(in <-chan map[string]interface{}, out chan<- struct{}) {
 		defer close(out)
-		pokemon := []PokemonPage{}
+		pokemon := []map[string]interface{}{}
 
 		for poke := range in {
 			pokemon = append(pokemon, poke)
@@ -33,7 +34,7 @@ func (s *Service) IntegrateToNotion(in <-chan extract.Pokemon) <-chan struct{} {
 		}
 
 		fmt.Println("Processed Pokémon:", len(pokemon))
-	}(pokemon, out)
+	}(pages, out)
 
 	return out
 }
@@ -60,4 +61,33 @@ func (s *Service) mapPokemonPage(wg *sync.WaitGroup, pokemon extract.Pokemon, ou
 	defer wg.Done()
 
 	out <- externalPokemonToInternalPokemon(pokemon, s.databaseID)
+}
+
+func (s *Service) createPokedexPages(in <-chan PokemonPage) <-chan map[string]interface{} {
+	var wg sync.WaitGroup
+	out := make(chan map[string]interface{})
+
+	go func(wg *sync.WaitGroup, in <-chan PokemonPage, out chan<- map[string]interface{}) {
+		defer close(out)
+
+		for page := range in {
+			wg.Add(1)
+			go s.createPage(wg, page, out)
+		}
+
+		wg.Wait()
+	}(&wg, in, out)
+
+	return out
+}
+
+func (s *Service) createPage(wg *sync.WaitGroup, page PokemonPage, out chan<- map[string]interface{}) {
+	defer wg.Done()
+
+	resp, err := s.client.createPokemonPage(page)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	out <- resp
 }
