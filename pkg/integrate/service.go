@@ -20,23 +20,11 @@ func NewService(conn Connection, secret IntegrationSecret, databaseId DatabaseID
 }
 
 func (s *Service) IntegrateToNotion(in <-chan extract.Pokemon) <-chan struct{} {
-	out := make(chan struct{})
 	pokemon := s.preparePokemonPages(in)
 	pages := s.createPokedexPages(pokemon)
+	done := s.logPageCreated(pages)
 
-	go func(in <-chan map[string]interface{}, out chan<- struct{}) {
-		defer close(out)
-		pokemon := []map[string]interface{}{}
-
-		for poke := range in {
-			pokemon = append(pokemon, poke)
-			fmt.Printf("Pokemon Page:\n%+v\n", poke)
-		}
-
-		fmt.Println("Processed Pokémon:", len(pokemon))
-	}(pages, out)
-
-	return out
+	return done
 }
 
 func (s *Service) preparePokemonPages(in <-chan extract.Pokemon) <-chan PokemonPage {
@@ -63,11 +51,11 @@ func (s *Service) mapPokemonPage(wg *sync.WaitGroup, pokemon extract.Pokemon, ou
 	out <- externalPokemonToInternalPokemon(pokemon, s.databaseID)
 }
 
-func (s *Service) createPokedexPages(in <-chan PokemonPage) <-chan map[string]interface{} {
+func (s *Service) createPokedexPages(in <-chan PokemonPage) <-chan NotionPageCreatedResponse {
 	var wg sync.WaitGroup
-	out := make(chan map[string]interface{})
+	out := make(chan NotionPageCreatedResponse)
 
-	go func(wg *sync.WaitGroup, in <-chan PokemonPage, out chan<- map[string]interface{}) {
+	go func(wg *sync.WaitGroup, in <-chan PokemonPage, out chan<- NotionPageCreatedResponse) {
 		defer close(out)
 
 		for page := range in {
@@ -81,7 +69,7 @@ func (s *Service) createPokedexPages(in <-chan PokemonPage) <-chan map[string]in
 	return out
 }
 
-func (s *Service) createPage(wg *sync.WaitGroup, page PokemonPage, out chan<- map[string]interface{}) {
+func (s *Service) createPage(wg *sync.WaitGroup, page PokemonPage, out chan<- NotionPageCreatedResponse) {
 	defer wg.Done()
 
 	resp, err := s.client.createPokemonPage(page)
@@ -90,4 +78,22 @@ func (s *Service) createPage(wg *sync.WaitGroup, page PokemonPage, out chan<- ma
 	}
 
 	out <- resp
+}
+
+func (s *Service) logPageCreated(in <-chan NotionPageCreatedResponse) <-chan struct{} {
+	out := make(chan struct{})
+
+	go func(in <-chan NotionPageCreatedResponse, out chan<- struct{}) {
+		defer close(out)
+		pages := []NotionPageCreatedResponse{}
+
+		for page := range in {
+			pages = append(pages, page)
+			fmt.Println("Pekédex Page Created:", page.Url)
+		}
+
+		fmt.Println("Processed Pokémon:", len(pages))
+	}(in, out)
+
+	return out
 }

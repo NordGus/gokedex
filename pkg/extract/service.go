@@ -1,6 +1,7 @@
 package extract
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"sync"
@@ -26,8 +27,9 @@ func (s *Service) ExtractPokemon() <-chan Pokemon {
 	species := s.getPokemonSpecies(pages)
 	details := s.getPokemonDetails(species)
 	pokemon := s.buildPokemon(details)
+	results := s.logPokemonExtraction(pokemon)
 
-	return pokemon
+	return results
 }
 
 func (s *Service) listPokemonSpecies() <-chan pokemonSpeciesPageResponse {
@@ -150,7 +152,34 @@ func (s *Service) buildPokemon(in <-chan fullPokemonData) <-chan Pokemon {
 func (s *Service) mapDataToPokemon(wg *sync.WaitGroup, data fullPokemonData, out chan<- Pokemon) {
 	defer wg.Done()
 
-	out <- mapPokemon(data.Species, data.Details)
+	pokemon := mapPokemon(data.Species, data.Details)
+
+	fmt.Println(pokemon.Name, "extracted from PokéAPI!")
+
+	out <- pokemon
+}
+
+func (s *Service) logPokemonExtraction(in <-chan Pokemon) <-chan Pokemon {
+	var wg sync.WaitGroup
+
+	out := make(chan Pokemon)
+
+	go func(wg *sync.WaitGroup, in <-chan Pokemon, out chan<- Pokemon) {
+		defer close(out)
+
+		for pokemon := range in {
+			wg.Add(1)
+
+			fmt.Println(pokemon.Name, "extracted from PokéAPI!")
+			out <- pokemon
+
+			wg.Done()
+		}
+
+		wg.Wait()
+	}(&wg, in, out)
+
+	return out
 }
 
 func parseIdFromResponseUrl(respUrl string) uint {
