@@ -1,4 +1,5 @@
 package integrate
 
-type PokemonResponse struct {
+type NotionPageCreatedResponse struct {
+	Url string `json:"url"`
 }

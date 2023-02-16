@@ -27,8 +27,8 @@ func newClient(conn Connection, secret IntegrationSecret) client {
 	}
 }
 
-func (c *client) createPokemonPage(pokemon PokemonPage) (map[string]interface{}, error) {
-	var data map[string]interface{}
+func (c *client) createPokemonPage(pokemon PokemonPage) (NotionPageCreatedResponse, error) {
+	var data NotionPageCreatedResponse
 
 	reqUrl, err := c.parseUrl("/pages", map[string]string{})
 	if err != nil {
