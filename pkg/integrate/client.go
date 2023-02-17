@@ -44,6 +44,7 @@ func (c *client) createPokemonPage(pokemon PokemonPage) (NotionPageCreatedRespon
 	if err != nil {
 		return data, err
 	}
+	defer req.Body.Close()
 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %v", c.secret))
 	req.Header.Set("Content-Type", "application/json")

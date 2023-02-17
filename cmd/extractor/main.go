@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"runtime"
 	"time"
 
 	"github.com/NordGus/gokedex/pkg/extract"
@@ -13,6 +14,7 @@ import (
 func main() {
 	secret := os.Getenv("NOTION_INTEGRATION_SECRET")
 	databaseId := os.Getenv("NOTION_INTEGRATION_DATABASE_ID")
+	workers := 10 * runtime.GOMAXPROCS(0)
 
 	pokeapi := http.Client{
 		Timeout: time.Millisecond * 3000,
@@ -24,12 +26,15 @@ func main() {
 
 	extractor := extract.NewService(&pokeapi)
 	integrator := integrate.NewService(&notion, integrate.IntegrationSecret(secret), integrate.DatabaseID(databaseId))
+	limits := make(chan bool, workers)
 
 	start := time.Now()
-	pokemon := extractor.ExtractPokemon()
-	finished := integrator.IntegrateToNotion(pokemon)
+	pokemon := extractor.ExtractPokemon(limits)
+	done := integrator.IntegrateToNotion(pokemon, limits)
 
-	<-finished
+	<-done
+
+	close(limits)
 
 	fmt.Println("Duration:", time.Since(start))
 }
