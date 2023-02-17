@@ -42,7 +42,6 @@ func (s *Service) preparePokemonPages(in <-chan extract.Pokemon, limits chan boo
 		for pokemon := range in {
 			wg.Add(1)
 			go s.mapPokemonPage(wg, pokemon, out, limits)
-			break
 		}
 
 		wg.Wait()
