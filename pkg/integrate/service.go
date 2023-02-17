@@ -7,6 +7,8 @@ import (
 	"github.com/NordGus/gokedex/pkg/extract"
 )
 
+const pokemonPageChannelBufferSize = 200
+
 type Service struct {
 	client     client
 	databaseID DatabaseID
@@ -29,7 +31,7 @@ func (s *Service) IntegrateToNotion(in <-chan extract.Pokemon, limits chan bool)
 
 func (s *Service) preparePokemonPages(in <-chan extract.Pokemon, limits chan bool) <-chan PokemonPage {
 	var wg sync.WaitGroup
-	out := make(chan PokemonPage)
+	out := make(chan PokemonPage, pokemonPageChannelBufferSize)
 
 	go func(wg *sync.WaitGroup, in <-chan extract.Pokemon, out chan<- PokemonPage, limits chan bool) {
 		defer close(out)
