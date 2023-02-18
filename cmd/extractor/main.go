@@ -14,7 +14,7 @@ import (
 func main() {
 	secret := os.Getenv("NOTION_INTEGRATION_SECRET")
 	databaseId := os.Getenv("NOTION_INTEGRATION_DATABASE_ID")
-	workers := 3 * runtime.GOMAXPROCS(0)
+	workers := 5 * runtime.GOMAXPROCS(0)
 
 	pokeapi := http.Client{
 		Timeout: time.Millisecond * 3000,

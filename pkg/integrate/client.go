@@ -3,6 +3,7 @@ package integrate
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -59,6 +60,19 @@ func (c *client) createPokemonPage(pokemon PokemonPage) (NotionPageCreatedRespon
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return data, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		d := map[string]interface{}{}
+
+		err = json.Unmarshal(body, &d)
+		if err != nil {
+			return data, errors.Join(errors.New("response was not ok"), err)
+		}
+
+		fmt.Println(d)
+
+		return data, errors.New("response was not ok")
 	}
 
 	err = json.Unmarshal(body, &data)
