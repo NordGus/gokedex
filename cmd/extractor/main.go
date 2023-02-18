@@ -14,14 +14,14 @@ import (
 func main() {
 	secret := os.Getenv("NOTION_INTEGRATION_SECRET")
 	databaseId := os.Getenv("NOTION_INTEGRATION_DATABASE_ID")
-	workers := 10 * runtime.GOMAXPROCS(0)
+	workers := 3 * runtime.GOMAXPROCS(0)
 
 	pokeapi := http.Client{
 		Timeout: time.Millisecond * 3000,
 	}
 
 	notion := http.Client{
-		Timeout: time.Second * 60,
+		Timeout: time.Second * 120,
 	}
 
 	extractor := extract.NewService(&pokeapi)

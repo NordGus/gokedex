@@ -7,7 +7,10 @@ import (
 	"github.com/NordGus/gokedex/pkg/extract"
 )
 
-const pokemonPageChannelBufferSize = 200
+const (
+	preparePokemonPagesChannelBufferSize = 5
+	createPokedexPagesChannelBufferSize  = 5
+)
 
 type Service struct {
 	client     client
@@ -31,7 +34,7 @@ func (s *Service) IntegrateToNotion(in <-chan extract.Pokemon, limits chan bool)
 
 func (s *Service) preparePokemonPages(in <-chan extract.Pokemon, limits chan bool) <-chan PokemonPage {
 	var wg sync.WaitGroup
-	out := make(chan PokemonPage, pokemonPageChannelBufferSize)
+	out := make(chan PokemonPage, preparePokemonPagesChannelBufferSize)
 
 	go func(wg *sync.WaitGroup, in <-chan extract.Pokemon, out chan<- PokemonPage, limits chan bool) {
 		defer close(out)
@@ -65,7 +68,7 @@ func (s *Service) mapPokemonPage(wg *sync.WaitGroup, pokemon extract.Pokemon, ou
 
 func (s *Service) createPokedexPages(in <-chan PokemonPage, limits chan bool) <-chan NotionPageCreatedResponse {
 	var wg sync.WaitGroup
-	out := make(chan NotionPageCreatedResponse)
+	out := make(chan NotionPageCreatedResponse, createPokedexPagesChannelBufferSize)
 
 	go func(wg *sync.WaitGroup, in <-chan PokemonPage, out chan<- NotionPageCreatedResponse, limits chan bool) {
 		defer close(out)
@@ -103,9 +106,11 @@ func (s *Service) createPage(wg *sync.WaitGroup, page PokemonPage, out chan<- No
 }
 
 func (s *Service) logPageCreated(in <-chan NotionPageCreatedResponse, limits chan bool) <-chan struct{} {
+	var wg sync.WaitGroup
+
 	out := make(chan struct{})
 
-	go func(in <-chan NotionPageCreatedResponse, out chan<- struct{}, limits chan bool) {
+	go func(wg *sync.WaitGroup, in <-chan NotionPageCreatedResponse, out chan<- struct{}, limits chan bool) {
 		defer close(out)
 		defer func(limits <-chan bool) {
 			<-limits
@@ -116,12 +121,16 @@ func (s *Service) logPageCreated(in <-chan NotionPageCreatedResponse, limits cha
 		processed := 0
 
 		for page := range in {
+			wg.Add(1)
 			processed++
 			fmt.Println("Pekédex Page Created:", page.Url)
+			wg.Done()
 		}
 
+		wg.Wait()
+
 		fmt.Println("Processed Pokémon:", processed)
-	}(in, out, limits)
+	}(&wg, in, out, limits)
 
 	return out
 }
