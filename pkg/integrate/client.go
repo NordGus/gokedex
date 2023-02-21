@@ -72,16 +72,11 @@ func (c *client) createPokemonPage(pokemon PokemonPage) (NotionPageCreatedRespon
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		d := map[string]interface{}{}
+		structErr := fmt.Errorf("\tPokemonPage: \n%+v", pokemon)
+		statusErr := fmt.Errorf("status was: %v", resp.StatusCode)
+		bodyErr := fmt.Errorf("body was: %v", string(body))
 
-		err = json.Unmarshal(body, &d)
-		if err != nil {
-			return data, errors.Join(errors.New("response was not ok"), err)
-		}
-
-		fmt.Println(d)
-
-		return data, errors.New("response was not ok")
+		return data, errors.Join(errors.New("response was not ok: "), statusErr, bodyErr, structErr)
 	}
 
 	err = json.Unmarshal(body, &data)
