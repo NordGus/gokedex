@@ -33,8 +33,8 @@ func main() {
 	integrator := integrate.NewService(globalSem, &notion, notionSem, integrate.IntegrationSecret(secret), integrate.DatabaseID(databaseId))
 
 	start := time.Now()
-	pokemon := extractor.ExtractPokemon(globalSem)
-	done := integrator.IntegrateToNotion(pokemon, globalSem)
+	pokemon := extractor.ExtractPokemon()
+	done := integrator.IntegrateToNotion(pokemon)
 
 	<-done
 
