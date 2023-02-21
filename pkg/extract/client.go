@@ -10,16 +10,25 @@ import (
 type client struct {
 	conn    Connection
 	baseUrl string
+	sem     chan bool
 }
 
-func newClient(conn Connection) client {
+func newClient(conn Connection, sem chan bool) client {
 	return client{
 		conn:    conn,
 		baseUrl: "https://pokeapi.co/api/v2",
+		sem:     sem,
 	}
 }
 
+func (c *client) freeConnection() {
+	<-c.sem
+}
+
 func (c *client) listPokemonSpecies(offset uint, limit uint) (pokemonSpeciesPageResponse, error) {
+	c.sem <- true
+	defer c.freeConnection()
+
 	var data pokemonSpeciesPageResponse
 
 	query := map[string]string{
@@ -52,6 +61,9 @@ func (c *client) listPokemonSpecies(offset uint, limit uint) (pokemonSpeciesPage
 }
 
 func (c *client) getPokemonSpecies(id uint) (pokemonSpeciesResponse, error) {
+	c.sem <- true
+	defer c.freeConnection()
+
 	var data pokemonSpeciesResponse
 
 	u, err := c.parseUrl(fmt.Sprintf("/pokemon-species/%v", id), map[string]string{})
@@ -79,6 +91,9 @@ func (c *client) getPokemonSpecies(id uint) (pokemonSpeciesResponse, error) {
 }
 
 func (c *client) getPokemon(id uint) (pokemonResponse, error) {
+	c.sem <- true
+	defer c.freeConnection()
+
 	var data pokemonResponse
 
 	u, err := c.parseUrl(fmt.Sprintf("/pokemon/%v", id), map[string]string{})

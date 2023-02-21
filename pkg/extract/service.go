@@ -17,6 +17,7 @@ const (
 
 type Service struct {
 	client client
+	sem    chan bool
 }
 
 type fullPokemonData struct {
@@ -24,9 +25,10 @@ type fullPokemonData struct {
 	Details pokemonResponse
 }
 
-func NewService(conn Connection) Service {
+func NewService(sem chan bool, conn Connection, connSem chan bool) Service {
 	return Service{
-		client: newClient(conn),
+		client: newClient(conn, connSem),
+		sem:    sem,
 	}
 }
 

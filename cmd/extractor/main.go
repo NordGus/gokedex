@@ -15,6 +15,7 @@ func main() {
 	secret := os.Getenv("NOTION_INTEGRATION_SECRET")
 	databaseId := os.Getenv("NOTION_INTEGRATION_DATABASE_ID")
 	workers := 5 * runtime.GOMAXPROCS(0)
+	clientWorkers := 5
 
 	pokeapi := http.Client{
 		Timeout: time.Millisecond * 3000,
@@ -24,17 +25,22 @@ func main() {
 		Timeout: time.Second * 120,
 	}
 
-	extractor := extract.NewService(&pokeapi)
-	integrator := integrate.NewService(&notion, integrate.IntegrationSecret(secret), integrate.DatabaseID(databaseId))
-	limits := make(chan bool, workers)
+	pokeapiSem := make(chan bool, clientWorkers)
+	notionSem := make(chan bool, clientWorkers)
+	globalSem := make(chan bool, workers)
+
+	extractor := extract.NewService(globalSem, &pokeapi, pokeapiSem)
+	integrator := integrate.NewService(globalSem, &notion, notionSem, integrate.IntegrationSecret(secret), integrate.DatabaseID(databaseId))
 
 	start := time.Now()
-	pokemon := extractor.ExtractPokemon(limits)
-	done := integrator.IntegrateToNotion(pokemon, limits)
+	pokemon := extractor.ExtractPokemon(globalSem)
+	done := integrator.IntegrateToNotion(pokemon, globalSem)
 
 	<-done
 
-	close(limits)
+	close(pokeapiSem)
+	close(notionSem)
+	close(globalSem)
 
 	fmt.Println("Duration:", time.Since(start))
 }

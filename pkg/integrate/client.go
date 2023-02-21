@@ -18,17 +18,26 @@ type client struct {
 	conn    Connection
 	baseUrl string
 	secret  IntegrationSecret
+	sem     chan bool
 }
 
-func newClient(conn Connection, secret IntegrationSecret) client {
+func newClient(conn Connection, sem chan bool, secret IntegrationSecret) client {
 	return client{
 		conn:    conn,
 		baseUrl: "https://api.notion.com/v1",
 		secret:  secret,
+		sem:     sem,
 	}
 }
 
+func (c *client) freeConnection() {
+	<-c.sem
+}
+
 func (c *client) createPokemonPage(pokemon PokemonPage) (NotionPageCreatedResponse, error) {
+	c.sem <- true
+	defer c.freeConnection()
+
 	var data NotionPageCreatedResponse
 
 	reqUrl, err := c.parseUrl("/pages", map[string]string{})

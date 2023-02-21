@@ -15,12 +15,14 @@ const (
 type Service struct {
 	client     client
 	databaseID DatabaseID
+	sem        chan bool
 }
 
-func NewService(conn Connection, secret IntegrationSecret, databaseId DatabaseID) Service {
+func NewService(sem chan bool, conn Connection, connSem chan bool, secret IntegrationSecret, databaseId DatabaseID) Service {
 	return Service{
-		client:     newClient(conn, secret),
+		client:     newClient(conn, connSem, secret),
 		databaseID: databaseId,
+		sem:        sem,
 	}
 }
 
