@@ -7,11 +7,6 @@ import (
 	"github.com/NordGus/gokedex/pkg/extract"
 )
 
-const (
-	preparePokemonPagesChannelBufferSize = 5
-	createPokedexPagesChannelBufferSize  = 5
-)
-
 type Service struct {
 	client     client
 	databaseID DatabaseID
@@ -40,7 +35,7 @@ func (s *Service) freeResources() {
 
 func (s *Service) preparePokemonPages(in <-chan extract.Pokemon) <-chan PokemonPage {
 	var wg sync.WaitGroup
-	out := make(chan PokemonPage, preparePokemonPagesChannelBufferSize)
+	out := make(chan PokemonPage)
 
 	go func(wg *sync.WaitGroup, in <-chan extract.Pokemon, out chan<- PokemonPage) {
 		s.sem <- true
@@ -68,7 +63,7 @@ func (s *Service) mapPokemonPage(wg *sync.WaitGroup, pokemon extract.Pokemon, ou
 
 func (s *Service) createPokedexPages(in <-chan PokemonPage) <-chan NotionPageCreatedResponse {
 	var wg sync.WaitGroup
-	out := make(chan NotionPageCreatedResponse, createPokedexPagesChannelBufferSize)
+	out := make(chan NotionPageCreatedResponse)
 
 	go func(wg *sync.WaitGroup, in <-chan PokemonPage, out chan<- NotionPageCreatedResponse) {
 		s.sem <- true
