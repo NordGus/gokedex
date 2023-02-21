@@ -5,12 +5,13 @@
     "customizations": {
         "vscode": {
             "extensions": [
-                "golang.Go",
-                "davidanson.vscode-markdownlint",
-                "shardulm94.trailing-spaces",
-                "IBM.output-colorizer",
-                "rangav.vscode-thunder-client"
-            ],
+				"golang.Go",
+				"davidanson.vscode-markdownlint",
+				"shardulm94.trailing-spaces",
+				"IBM.output-colorizer",
+				"rangav.vscode-thunder-client",
+				"donjayamanne.githistory"
+			],
             "settings": {
                 "go.useLanguageServer": true
             }
