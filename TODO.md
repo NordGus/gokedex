@@ -4,3 +4,7 @@
 [x] Create Notion Client Integration
 [x] Finish touches in the styling of the Pokémon Page Content Blocks
 [x] Implement the counting semaphore pattern
+[ ] Implement a semaphore for the HTTP clients to limit active connections
+[ ] Write docs explaning how the algorithms work
+[ ] Refactor code to be more in a Hexagonal Architecture Style
+[ ] Write test suite
