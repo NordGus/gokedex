@@ -32,28 +32,29 @@ func NewService(sem chan bool, conn Connection, connSem chan bool) Service {
 	}
 }
 
-func (s *Service) ExtractPokemon(limits chan bool) <-chan Pokemon {
-	pages := s.listPokemonSpecies(limits)
-	species := s.getPokemonSpecies(pages, limits)
-	details := s.getPokemonDetails(species, limits)
-	pokemon := s.buildPokemon(details, limits)
-	results := s.logPokemonExtraction(pokemon, limits)
+func (s *Service) ExtractPokemon() <-chan Pokemon {
+	pages := s.listPokemonSpecies()
+	species := s.getPokemonSpecies(pages)
+	details := s.getPokemonDetails(species)
+	pokemon := s.buildPokemon(details)
+	results := s.logPokemonExtraction(pokemon)
 
 	return results
 }
 
-func (s *Service) listPokemonSpecies(limits chan bool) <-chan pokemonSpeciesPageResponse {
+func (s *Service) freeResources() {
+	<-s.sem
+}
+
+func (s *Service) listPokemonSpecies() <-chan pokemonSpeciesPageResponse {
 	offset := uint(0)
 	limit := uint(20)
 	out := make(chan pokemonSpeciesPageResponse, listPokemonSpeciesChannelBufferSize)
 
-	go func(offset uint, limit uint, out chan<- pokemonSpeciesPageResponse, limits chan bool) {
+	go func(offset uint, limit uint, out chan<- pokemonSpeciesPageResponse) {
+		s.sem <- true
+		defer s.freeResources()
 		defer close(out)
-		defer func(limits <-chan bool) {
-			<-limits
-		}(limits)
-
-		limits <- true
 
 		for ; ; offset += limit {
 			data, err := s.client.listPokemonSpecies(offset, limit)
@@ -67,45 +68,39 @@ func (s *Service) listPokemonSpecies(limits chan bool) <-chan pokemonSpeciesPage
 				break
 			}
 		}
-	}(offset, limit, out, limits)
+	}(offset, limit, out)
 
 	return out
 }
 
-func (s *Service) getPokemonSpecies(in <-chan pokemonSpeciesPageResponse, limits chan bool) <-chan pokemonSpeciesResponse {
+func (s *Service) getPokemonSpecies(in <-chan pokemonSpeciesPageResponse) <-chan pokemonSpeciesResponse {
 	var wg sync.WaitGroup
 
 	out := make(chan pokemonSpeciesResponse, getPokemonSpeciesChannelBuffersize)
 
-	go func(wg *sync.WaitGroup, in <-chan pokemonSpeciesPageResponse, out chan<- pokemonSpeciesResponse, limits chan bool) {
+	go func(wg *sync.WaitGroup, in <-chan pokemonSpeciesPageResponse, out chan<- pokemonSpeciesResponse) {
+		s.sem <- true
+		defer s.freeResources()
 		defer close(out)
-		defer func(limits <-chan bool) {
-			<-limits
-		}(limits)
-
-		limits <- true
 
 		for resp := range in {
 			wg.Add(len(resp.Results))
 
 			for _, species := range resp.Results {
-				go s.retrievePokemonSpecies(wg, parseIdFromResponseUrl(species.Url), out, limits)
+				go s.retrievePokemonSpecies(wg, parseIdFromResponseUrl(species.Url), out)
 			}
 		}
 
 		wg.Wait()
-	}(&wg, in, out, limits)
+	}(&wg, in, out)
 
 	return out
 }
 
-func (s *Service) retrievePokemonSpecies(wg *sync.WaitGroup, id uint, out chan<- pokemonSpeciesResponse, limits chan bool) {
+func (s *Service) retrievePokemonSpecies(wg *sync.WaitGroup, id uint, out chan<- pokemonSpeciesResponse) {
+	s.sem <- true
+	defer s.freeResources()
 	defer wg.Done()
-	defer func(limits <-chan bool) {
-		<-limits
-	}(limits)
-
-	limits <- true
 
 	data, err := s.client.getPokemonSpecies(uint(id))
 	if err != nil {
@@ -115,38 +110,32 @@ func (s *Service) retrievePokemonSpecies(wg *sync.WaitGroup, id uint, out chan<-
 	out <- data
 }
 
-func (s *Service) getPokemonDetails(in <-chan pokemonSpeciesResponse, limits chan bool) <-chan fullPokemonData {
+func (s *Service) getPokemonDetails(in <-chan pokemonSpeciesResponse) <-chan fullPokemonData {
 	var wg sync.WaitGroup
 
 	out := make(chan fullPokemonData, getPokemonDetailsChannelBufferSize)
 
-	go func(wg *sync.WaitGroup, in <-chan pokemonSpeciesResponse, out chan<- fullPokemonData, limits chan bool) {
+	go func(wg *sync.WaitGroup, in <-chan pokemonSpeciesResponse, out chan<- fullPokemonData) {
+		s.sem <- true
+		defer s.freeResources()
 		defer close(out)
-		defer func(limits <-chan bool) {
-			<-limits
-		}(limits)
-
-		limits <- true
 
 		for resp := range in {
 			wg.Add(1)
 
-			go s.retrievePokemonDetail(wg, resp, out, limits)
+			go s.retrievePokemonDetail(wg, resp, out)
 		}
 
 		wg.Wait()
-	}(&wg, in, out, limits)
+	}(&wg, in, out)
 
 	return out
 }
 
-func (s *Service) retrievePokemonDetail(wg *sync.WaitGroup, species pokemonSpeciesResponse, out chan<- fullPokemonData, limits chan bool) {
+func (s *Service) retrievePokemonDetail(wg *sync.WaitGroup, species pokemonSpeciesResponse, out chan<- fullPokemonData) {
+	s.sem <- true
+	defer s.freeResources()
 	defer wg.Done()
-	defer func(limits <-chan bool) {
-		<-limits
-	}(limits)
-
-	limits <- true
 
 	for _, variety := range species.Varieties {
 		if variety.IsDefault {
@@ -165,55 +154,46 @@ func (s *Service) retrievePokemonDetail(wg *sync.WaitGroup, species pokemonSpeci
 	}
 }
 
-func (s *Service) buildPokemon(in <-chan fullPokemonData, limits chan bool) <-chan Pokemon {
+func (s *Service) buildPokemon(in <-chan fullPokemonData) <-chan Pokemon {
 	var wg sync.WaitGroup
 
 	out := make(chan Pokemon, buildPokemonChannelBufferSize)
 
-	go func(wg *sync.WaitGroup, in <-chan fullPokemonData, out chan<- Pokemon, limits chan bool) {
+	go func(wg *sync.WaitGroup, in <-chan fullPokemonData, out chan<- Pokemon) {
+		s.sem <- true
+		defer s.freeResources()
 		defer close(out)
-		defer func(limits <-chan bool) {
-			<-limits
-		}(limits)
-
-		limits <- true
 
 		for resp := range in {
 			wg.Add(1)
-			go s.mapDataToPokemon(wg, resp, out, limits)
+			go s.mapDataToPokemon(wg, resp, out)
 		}
 
 		wg.Wait()
-	}(&wg, in, out, limits)
+	}(&wg, in, out)
 
 	return out
 }
 
-func (s *Service) mapDataToPokemon(wg *sync.WaitGroup, data fullPokemonData, out chan<- Pokemon, limits chan bool) {
+func (s *Service) mapDataToPokemon(wg *sync.WaitGroup, data fullPokemonData, out chan<- Pokemon) {
+	s.sem <- true
+	defer s.freeResources()
 	defer wg.Done()
-	defer func(limits <-chan bool) {
-		<-limits
-	}(limits)
-
-	limits <- true
 
 	pokemon := mapPokemon(data.Species, data.Details)
 
 	out <- pokemon
 }
 
-func (s *Service) logPokemonExtraction(in <-chan Pokemon, limits chan bool) <-chan Pokemon {
+func (s *Service) logPokemonExtraction(in <-chan Pokemon) <-chan Pokemon {
 	var wg sync.WaitGroup
 
 	out := make(chan Pokemon, logPokemonExtractionChannelBufferSize)
 
-	go func(wg *sync.WaitGroup, in <-chan Pokemon, out chan<- Pokemon, limits chan bool) {
+	go func(wg *sync.WaitGroup, in <-chan Pokemon, out chan<- Pokemon) {
+		s.sem <- true
+		defer s.freeResources()
 		defer close(out)
-		defer func(limits <-chan bool) {
-			<-limits
-		}(limits)
-
-		limits <- true
 
 		for pokemon := range in {
 			wg.Add(1)
@@ -225,7 +205,7 @@ func (s *Service) logPokemonExtraction(in <-chan Pokemon, limits chan bool) <-ch
 		}
 
 		wg.Wait()
-	}(&wg, in, out, limits)
+	}(&wg, in, out)
 
 	return out
 }
