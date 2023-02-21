@@ -26,78 +26,70 @@ func NewService(sem chan bool, conn Connection, connSem chan bool, secret Integr
 	}
 }
 
-func (s *Service) IntegrateToNotion(in <-chan extract.Pokemon, limits chan bool) <-chan struct{} {
-	pages := s.preparePokemonPages(in, limits)
-	responses := s.createPokedexPages(pages, limits)
-	done := s.logPageCreated(responses, limits)
+func (s *Service) IntegrateToNotion(in <-chan extract.Pokemon) <-chan struct{} {
+	pages := s.preparePokemonPages(in)
+	responses := s.createPokedexPages(pages)
+	done := s.logPageCreated(responses)
 
 	return done
 }
 
-func (s *Service) preparePokemonPages(in <-chan extract.Pokemon, limits chan bool) <-chan PokemonPage {
+func (s *Service) freeResources() {
+	<-s.sem
+}
+
+func (s *Service) preparePokemonPages(in <-chan extract.Pokemon) <-chan PokemonPage {
 	var wg sync.WaitGroup
 	out := make(chan PokemonPage, preparePokemonPagesChannelBufferSize)
 
-	go func(wg *sync.WaitGroup, in <-chan extract.Pokemon, out chan<- PokemonPage, limits chan bool) {
+	go func(wg *sync.WaitGroup, in <-chan extract.Pokemon, out chan<- PokemonPage) {
+		s.sem <- true
+		defer s.freeResources()
 		defer close(out)
-		defer func(limits <-chan bool) {
-			<-limits
-		}(limits)
-
-		limits <- true
 
 		for pokemon := range in {
 			wg.Add(1)
-			go s.mapPokemonPage(wg, pokemon, out, limits)
+			go s.mapPokemonPage(wg, pokemon, out)
 		}
 
 		wg.Wait()
-	}(&wg, in, out, limits)
+	}(&wg, in, out)
 
 	return out
 }
 
-func (s *Service) mapPokemonPage(wg *sync.WaitGroup, pokemon extract.Pokemon, out chan<- PokemonPage, limits chan bool) {
+func (s *Service) mapPokemonPage(wg *sync.WaitGroup, pokemon extract.Pokemon, out chan<- PokemonPage) {
+	s.sem <- true
+	defer s.freeResources()
 	defer wg.Done()
-	defer func(limits <-chan bool) {
-		<-limits
-	}(limits)
-
-	limits <- true
 
 	out <- externalPokemonToInternalPokemon(pokemon, s.databaseID)
 }
 
-func (s *Service) createPokedexPages(in <-chan PokemonPage, limits chan bool) <-chan NotionPageCreatedResponse {
+func (s *Service) createPokedexPages(in <-chan PokemonPage) <-chan NotionPageCreatedResponse {
 	var wg sync.WaitGroup
 	out := make(chan NotionPageCreatedResponse, createPokedexPagesChannelBufferSize)
 
-	go func(wg *sync.WaitGroup, in <-chan PokemonPage, out chan<- NotionPageCreatedResponse, limits chan bool) {
+	go func(wg *sync.WaitGroup, in <-chan PokemonPage, out chan<- NotionPageCreatedResponse) {
+		s.sem <- true
+		defer s.freeResources()
 		defer close(out)
-		defer func(limits <-chan bool) {
-			<-limits
-		}(limits)
-
-		limits <- true
 
 		for page := range in {
 			wg.Add(1)
-			go s.createPage(wg, page, out, limits)
+			go s.createPage(wg, page, out)
 		}
 
 		wg.Wait()
-	}(&wg, in, out, limits)
+	}(&wg, in, out)
 
 	return out
 }
 
-func (s *Service) createPage(wg *sync.WaitGroup, page PokemonPage, out chan<- NotionPageCreatedResponse, limits chan bool) {
+func (s *Service) createPage(wg *sync.WaitGroup, page PokemonPage, out chan<- NotionPageCreatedResponse) {
+	s.sem <- true
+	defer s.freeResources()
 	defer wg.Done()
-	defer func(limits <-chan bool) {
-		<-limits
-	}(limits)
-
-	limits <- true
 
 	resp, err := s.client.createPokemonPage(page)
 	if err != nil {
@@ -107,18 +99,15 @@ func (s *Service) createPage(wg *sync.WaitGroup, page PokemonPage, out chan<- No
 	out <- resp
 }
 
-func (s *Service) logPageCreated(in <-chan NotionPageCreatedResponse, limits chan bool) <-chan struct{} {
+func (s *Service) logPageCreated(in <-chan NotionPageCreatedResponse) <-chan struct{} {
 	var wg sync.WaitGroup
 
 	out := make(chan struct{})
 
-	go func(wg *sync.WaitGroup, in <-chan NotionPageCreatedResponse, out chan<- struct{}, limits chan bool) {
+	go func(wg *sync.WaitGroup, in <-chan NotionPageCreatedResponse, out chan<- struct{}) {
+		s.sem <- true
+		defer s.freeResources()
 		defer close(out)
-		defer func(limits <-chan bool) {
-			<-limits
-		}(limits)
-
-		limits <- true
 
 		processed := 0
 
@@ -132,7 +121,7 @@ func (s *Service) logPageCreated(in <-chan NotionPageCreatedResponse, limits cha
 		wg.Wait()
 
 		fmt.Println("Processed Pokémon:", processed)
-	}(&wg, in, out, limits)
+	}(&wg, in, out)
 
 	return out
 }
