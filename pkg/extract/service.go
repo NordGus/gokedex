@@ -7,14 +7,6 @@ import (
 	"sync"
 )
 
-const (
-	listPokemonSpeciesChannelBufferSize   = 5
-	getPokemonSpeciesChannelBuffersize    = 5
-	getPokemonDetailsChannelBufferSize    = 5
-	buildPokemonChannelBufferSize         = 5
-	logPokemonExtractionChannelBufferSize = 5
-)
-
 type Service struct {
 	client client
 	sem    chan bool
@@ -49,7 +41,7 @@ func (s *Service) freeResources() {
 func (s *Service) listPokemonSpecies() <-chan pokemonSpeciesPageResponse {
 	offset := uint(0)
 	limit := uint(20)
-	out := make(chan pokemonSpeciesPageResponse, listPokemonSpeciesChannelBufferSize)
+	out := make(chan pokemonSpeciesPageResponse)
 
 	go func(offset uint, limit uint, out chan<- pokemonSpeciesPageResponse) {
 		s.sem <- true
@@ -76,7 +68,7 @@ func (s *Service) listPokemonSpecies() <-chan pokemonSpeciesPageResponse {
 func (s *Service) getPokemonSpecies(in <-chan pokemonSpeciesPageResponse) <-chan pokemonSpeciesResponse {
 	var wg sync.WaitGroup
 
-	out := make(chan pokemonSpeciesResponse, getPokemonSpeciesChannelBuffersize)
+	out := make(chan pokemonSpeciesResponse)
 
 	go func(wg *sync.WaitGroup, in <-chan pokemonSpeciesPageResponse, out chan<- pokemonSpeciesResponse) {
 		s.sem <- true
@@ -113,7 +105,7 @@ func (s *Service) retrievePokemonSpecies(wg *sync.WaitGroup, id uint, out chan<-
 func (s *Service) getPokemonDetails(in <-chan pokemonSpeciesResponse) <-chan fullPokemonData {
 	var wg sync.WaitGroup
 
-	out := make(chan fullPokemonData, getPokemonDetailsChannelBufferSize)
+	out := make(chan fullPokemonData)
 
 	go func(wg *sync.WaitGroup, in <-chan pokemonSpeciesResponse, out chan<- fullPokemonData) {
 		s.sem <- true
@@ -157,7 +149,7 @@ func (s *Service) retrievePokemonDetail(wg *sync.WaitGroup, species pokemonSpeci
 func (s *Service) buildPokemon(in <-chan fullPokemonData) <-chan Pokemon {
 	var wg sync.WaitGroup
 
-	out := make(chan Pokemon, buildPokemonChannelBufferSize)
+	out := make(chan Pokemon)
 
 	go func(wg *sync.WaitGroup, in <-chan fullPokemonData, out chan<- Pokemon) {
 		s.sem <- true
@@ -188,7 +180,7 @@ func (s *Service) mapDataToPokemon(wg *sync.WaitGroup, data fullPokemonData, out
 func (s *Service) logPokemonExtraction(in <-chan Pokemon) <-chan Pokemon {
 	var wg sync.WaitGroup
 
-	out := make(chan Pokemon, logPokemonExtractionChannelBufferSize)
+	out := make(chan Pokemon)
 
 	go func(wg *sync.WaitGroup, in <-chan Pokemon, out chan<- Pokemon) {
 		s.sem <- true
