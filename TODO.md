@@ -6,4 +6,3 @@
 [x] Implement the counting semaphore pattern
 [x] Implement a semaphore for the HTTP clients to limit active connections
 [ ] Write docs explaning how the algorithms work
-
